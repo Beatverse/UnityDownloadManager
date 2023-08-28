@@ -3,10 +3,12 @@ using System;
 [Serializable]
 public class DownloadItem
 {
-    public string FileUri { get; set; }
+    public string FileURL { get; set; }
+    public string FileName { get; set; }
 
-    public DownloadItem(string uri)
+    public DownloadItem(string url, string fileName)
     {
-        FileUri = uri;
+        FileURL = url;
+        FileName = fileName;
     }
 }

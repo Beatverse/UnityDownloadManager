@@ -1,10 +1,11 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using Unity.VisualScripting;
 using UnityEngine;
 
-public class DownloadManager
+public class DownloadManager : MonoBehaviour
 {
     private static DownloadManager _instance;
 
@@ -12,15 +13,11 @@ public class DownloadManager
     {
         get
         {
-            if (_instance == null)
-            {
-                _instance = new DownloadManager();
-            }
             return _instance;
         }
     }
 
-    public string StoragePath = Path.Join(Application.persistentDataPath, "Downloads");
+    public string StoragePath = "Downloads";
     public int MaxConcurrencyJobs = 3;
 
     private DownloadItemQueue _downloadItemQueue;
@@ -28,8 +25,12 @@ public class DownloadManager
 
     private bool _downloadItemQueueChanged;
 
-    public DownloadManager()
+    public void Start()
     {
+        StoragePath = Path.Join(Application.persistentDataPath, StoragePath);
+
+        _instance = this;
+
         _downloadItemQueue = new DownloadItemQueue();
         _downloadJobList = new DownloadJobList();
 
@@ -38,22 +39,41 @@ public class DownloadManager
 
     public void Load()
     {
+         // Check if the directory doesn't exist
+        if (!Directory.Exists(StoragePath))
+        {
+            try
+            {
+                Directory.CreateDirectory(StoragePath);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("An error occurred: " + ex.Message);
+            }
+        }
+
         _downloadItemQueue.Load(StoragePath);
-        _downloadJobList.Load(StoragePath);
+        _downloadJobList.Load(StoragePath, (list, item) => {
+            DeserializeJob(list, item);
+        });
 
         _downloadItemQueueChanged = false;
     }
 
     public void Update()
     {
-        bool jobListChanged = false;
+        bool jobListChanged = _downloadJobList.Count > 0;
 
         for (int i = _downloadJobList.Count - 1; i >= 0; --i)
         {
             if (_downloadJobList[i].IsDone)
             {
+                Destroy(_downloadJobList[i].gameObject);
                 _downloadJobList.RemoveAt(i);
-                jobListChanged = true;
+            }
+            else if (!_downloadJobList[i].HasStarted)
+            {
+                _downloadJobList[i].Download();
             }
         }
 
@@ -62,7 +82,14 @@ public class DownloadManager
             if (_downloadItemQueue.Count > 0)
             {
                 var item = _downloadItemQueue.Dequeue();
-                _downloadJobList.Add(new DownloadJob(item));
+
+                GameObject go = new GameObject("Download", typeof(DownloadJob));
+                go.transform.parent = transform;
+
+                var job = go.GetComponent<DownloadJob>();
+                job.Init(item, StoragePath);
+
+                _downloadJobList.Add(job);
                 jobListChanged = true;
             }
             else
@@ -82,8 +109,19 @@ public class DownloadManager
         }
     }
 
-    public void Download (string uri)
+    public void Download (string url, string fileName)
     {
-        _downloadItemQueue.Enqueue(new DownloadItem(uri));
+        _downloadItemQueue.Enqueue(new DownloadItem(url, fileName));
+    }
+
+    public void DeserializeJob (List<DownloadJob> list, DownloadJobData data)
+    {
+        GameObject go = new GameObject("Download", typeof(DownloadJob));
+        go.transform.parent = transform;
+
+        var job = go.GetComponent<DownloadJob>();
+        job.DeserializeData(data);
+
+        list.Add(job);
     }
 }
