@@ -8,25 +8,28 @@ public class DownloadItemQueue : Queue<DownloadItem>
 {
     public string DataFileName = "downloads.xml";
 
-    public void Load(string storagePath)
+    public List<DownloadItem> Load(string storagePath)
     {
         string filePath = Path.Join(storagePath, DataFileName);
 
         if (!File.Exists(filePath))
         {
-            return;
+            return null;
         }
 
+        List<DownloadItem> deserializedList = null;
         using (FileStream fileStream = new FileStream(filePath, FileMode.Open))
         {
             XmlSerializer xmlSerializer = new XmlSerializer(typeof(List<DownloadItem>));
-            List<DownloadItem> deserializedQueue = (List<DownloadItem>)xmlSerializer.Deserialize(fileStream);
+            deserializedList = (List<DownloadItem>)xmlSerializer.Deserialize(fileStream);
 
-            foreach (var item in deserializedQueue)
+            foreach (var item in deserializedList)
             {
                 Enqueue(item);
             }
         }
+
+        return deserializedList;
     }
 
     public void Save(string storagePath)

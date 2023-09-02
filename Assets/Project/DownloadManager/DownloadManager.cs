@@ -24,6 +24,7 @@ public class DownloadManager : MonoBehaviour
     private DownloadJobList _downloadJobList;
 
     private bool _downloadItemQueueChanged;
+    private Dictionary<string, DownloadOutput> _downloadOutputs;
 
     public void Awake()
     {
@@ -34,8 +35,14 @@ public class DownloadManager : MonoBehaviour
 
         _downloadItemQueue = new DownloadItemQueue();
         _downloadJobList = new DownloadJobList();
+        _downloadOutputs = new Dictionary<string, DownloadOutput>();
 
         _downloadItemQueueChanged = false;
+    }
+
+    public DownloadOutput GetDownloadStatus (string fileName)
+    {
+        return _downloadOutputs[fileName];
     }
 
     public void Load()
@@ -53,7 +60,12 @@ public class DownloadManager : MonoBehaviour
             }
         }
 
-        _downloadItemQueue.Load(StoragePath);
+        var downloadList = _downloadItemQueue.Load(StoragePath);
+        foreach (var downloadItem in downloadList)
+        {
+            _downloadOutputs[downloadItem.FileName] = new DownloadOutput(downloadItem.FileURL, downloadItem.FileName);
+        }
+
         _downloadJobList.Load(StoragePath, (list, item) => {
             DeserializeJob(list, item);
         });
@@ -67,14 +79,34 @@ public class DownloadManager : MonoBehaviour
 
         for (int i = _downloadJobList.Count - 1; i >= 0; --i)
         {
-            if (_downloadJobList[i].IsDone)
+            var job = _downloadJobList[i];
+
+            if (!_downloadOutputs.ContainsKey(job.FileName))
             {
-                Destroy(_downloadJobList[i].gameObject);
+                _downloadOutputs.Add(job.FileName, new DownloadOutput(job.FileURL, job.FileName));
+            }
+
+            _downloadOutputs[job.FileName].DownloadedBytes = job.DownloadedBytes;
+            _downloadOutputs[job.FileName].TotalBytes = job.TotalBytes;
+
+            if (job.IsDone)
+            {
+                if (job.Success)
+                {
+                    _downloadOutputs[job.FileName].Status = DownloadOutput.DownloadStatus.Success;
+                }
+                else
+                {
+                    _downloadOutputs[job.FileName].Status = DownloadOutput.DownloadStatus.Error;
+                }
+
+                Destroy(job.gameObject);
                 _downloadJobList.RemoveAt(i);
             }
-            else if (!_downloadJobList[i].HasStarted)
+            else if (!job.HasStarted)
             {
-                _downloadJobList[i].Download();
+                _downloadOutputs[job.FileName].Status = DownloadOutput.DownloadStatus.InProgress;
+                job.Download();
             }
         }
 
@@ -113,6 +145,15 @@ public class DownloadManager : MonoBehaviour
     public void Download (string url, string fileName)
     {
         _downloadItemQueue.Enqueue(new DownloadItem(url, fileName));
+
+        if (!_downloadOutputs.ContainsKey(fileName))
+        {
+            _downloadOutputs.Add(fileName, new DownloadOutput(url, fileName));
+        }
+        else
+        {
+            _downloadOutputs[fileName].Status = DownloadOutput.DownloadStatus.InProgress;
+        }
     }
 
     public void DeserializeJob (List<DownloadJob> list, DownloadJobData data)

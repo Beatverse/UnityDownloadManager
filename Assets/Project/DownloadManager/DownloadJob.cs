@@ -27,6 +27,7 @@ public class DownloadJob : MonoBehaviour
     public long DownloadChunkSize = 1024 * 1024;
 
     public string FileURL { get; set; }
+    public string FileName { get; set; }
     public string FileDestination { get; set; }
     public long TotalBytes { get; set; }
     public long DownloadedBytes { get; set; }
@@ -54,6 +55,7 @@ public class DownloadJob : MonoBehaviour
     public void Init (DownloadItem item, string storagePath)
     {
         FileURL = item.FileURL;
+        FileName= item.FileName;
         FileDestination = Path.Join(storagePath, item.FileName);
         TotalBytes = 0;
         DownloadedBytes = 0;
@@ -156,6 +158,7 @@ public class DownloadJob : MonoBehaviour
                 }
 
                 _fileStream.Close();
+                DownloadResult = Result.Success;
             }
         }
 
