@@ -25,9 +25,10 @@ public class DownloadManager : MonoBehaviour
 
     private bool _downloadItemQueueChanged;
 
-    public void Start()
+    public void Awake()
     {
         StoragePath = Path.Join(Application.persistentDataPath, StoragePath);
+        Debug.Log("DOWNLOAD PATH: " + StoragePath);
 
         _instance = this;
 

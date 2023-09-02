@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.IO;
+using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -66,6 +67,17 @@ public class DownloadJob : MonoBehaviour
         StartCoroutine(DownloadFileCoroutine());
     }
 
+    public void OnApplicationQuit ()
+    {
+        Debug.Log("QUIT JOB");
+        StopAllCoroutines();
+        if (_fileStream != null)
+        {
+            _fileStream.Close();
+        }
+        IsDone = true;
+    }
+
     IEnumerator DownloadFileCoroutine()
     {
         if (File.Exists(FileDestination))
@@ -86,48 +98,65 @@ public class DownloadJob : MonoBehaviour
 
         if (DownloadedBytes < TotalBytes)
         {
-            _fileStream = new FileStream(FileDestination, FileMode.OpenOrCreate, FileAccess.Write);
-            _fileStream.Seek(DownloadedBytes, SeekOrigin.Begin);
-
-            long byteIndex = DownloadedBytes;
-
-            while (byteIndex < TotalBytes)
+            try
             {
-                int endByte = (int)Mathf.Min(byteIndex + DownloadChunkSize - 1, TotalBytes - 1);
+                _fileStream = new FileStream(FileDestination, FileMode.OpenOrCreate, FileAccess.Write);
+                _fileStream.Seek(DownloadedBytes, SeekOrigin.Begin);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError(ex.ToString());
+                DownloadResult = Result.FileWriteError;
+                _fileStream = null;
+            }
 
-                UnityWebRequest chunkRequest = UnityWebRequest.Get(FileURL);
-                chunkRequest.SetRequestHeader("Range", "bytes=" + byteIndex + "-" + endByte);
-
-                yield return chunkRequest.SendWebRequest();
-
-                if (chunkRequest.result == UnityWebRequest.Result.ConnectionError || chunkRequest.result == UnityWebRequest.Result.ProtocolError)
+            if (_fileStream != null)
+            {
+                long byteIndex = DownloadedBytes;
+                while (byteIndex < TotalBytes)
                 {
-                    Debug.LogError("Error downloading bytes " + byteIndex + ": " + chunkRequest.error);
+                    int endByte = (int)Mathf.Min(byteIndex + DownloadChunkSize - 1, TotalBytes - 1);
 
-                    DownloadResult = Result.WebError;
-                    break;
-                }
-                else
-                {
-                    try
+                    UnityWebRequest chunkRequest = UnityWebRequest.Get(FileURL);
+                    chunkRequest.SetRequestHeader("Range", "bytes=" + byteIndex + "-" + endByte);
+
+                    yield return chunkRequest.SendWebRequest();
+
+                    if (chunkRequest.result == UnityWebRequest.Result.ConnectionError || chunkRequest.result == UnityWebRequest.Result.ProtocolError)
                     {
-                        byte[] chunkData = chunkRequest.downloadHandler.data;
-                        _fileStream.Write(chunkData, 0, chunkData.Length);
-                        DownloadedBytes += chunkData.Length;
+                        Debug.LogError("Error downloading bytes " + byteIndex + ": " + chunkRequest.error);
 
-                        Debug.Log("Downloaded bytes " + chunkData.Length);
-                        byteIndex += chunkData.Length;
+                        DownloadResult = Result.WebError;
+                        break;
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        Debug.LogError("Error saving file: " + ex.Message);
-                        DownloadResult = Result.FileWriteError;
+                        try
+                        {
+                            byte[] chunkData = chunkRequest.downloadHandler.data;
+                            long chunkLength = chunkData.Length;
+                            _fileStream.Write(chunkData, 0, (int)chunkLength);
+                            DownloadedBytes += chunkLength;
+
+                            Debug.Log("Downloaded bytes " + chunkLength);
+                            byteIndex += chunkLength;
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.LogError("Error saving file: " + ex.Message);
+                            DownloadResult = Result.FileWriteError;
+                            break;
+                        }
+                    }
+
+                    if (IsDone)
+                    {
                         break;
                     }
                 }
-            }
 
-            _fileStream.Close();
+                _fileStream.Close();
+            }
         }
 
         Debug.Log("Download complete!");
