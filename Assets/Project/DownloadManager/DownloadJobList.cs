@@ -19,12 +19,18 @@ public class DownloadJobList : List<DownloadJob>
 
         using (FileStream fileStream = new FileStream(filePath, FileMode.Open))
         {
-            var formatter = new BinaryFormatter();
-            var deserializedList = (List<DownloadJobData>)formatter.Deserialize(fileStream);
-
-            foreach (var item in deserializedList)
+            try
             {
-                createAction(this, item);
+                var formatter = new BinaryFormatter();
+                var deserializedList = (List<DownloadJobData>)formatter.Deserialize(fileStream);
+
+                foreach (var item in deserializedList)
+                {
+                    createAction(this, item);
+                }
+            }
+            catch (Exception)
+            {
             }
         }
     }

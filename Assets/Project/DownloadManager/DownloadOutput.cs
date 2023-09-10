@@ -18,6 +18,15 @@ public class DownloadOutput
     public long TotalBytes { get; set; }
     public DownloadStatus Status { get; set; }
 
+    public DownloadOutput()
+    {
+        FileURL = "";
+        FileName = "";
+        DownloadedBytes = 0;
+        TotalBytes = 0;
+        Status = DownloadStatus.Pending;
+    }
+
     public DownloadOutput(string url, string fileName)
     {
         FileURL = url;

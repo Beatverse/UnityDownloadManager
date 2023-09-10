@@ -4,11 +4,11 @@ using System.Xml.Serialization;
 using System.Runtime.Serialization;
 using System;
 
-public class DownloadItemQueue : Queue<DownloadItem>
+public class DownloadOutputMap : Dictionary<string, DownloadOutput>
 {
-    public string DataFileName = "downloads.xml";
+    public string DataFileName = "outputs.xml";
 
-    public List<DownloadItem> Load(string storagePath)
+    public List<DownloadOutput> Load(string storagePath)
     {
         string filePath = Path.Join(storagePath, DataFileName);
 
@@ -17,17 +17,17 @@ public class DownloadItemQueue : Queue<DownloadItem>
             return null;
         }
 
-        List<DownloadItem> deserializedList = null;
+        List<DownloadOutput> deserializedList = null;
         using (FileStream fileStream = new FileStream(filePath, FileMode.Open))
         {
             try
             {
-                XmlSerializer xmlSerializer = new XmlSerializer(typeof(List<DownloadItem>));
-                deserializedList = (List<DownloadItem>)xmlSerializer.Deserialize(fileStream);
+                XmlSerializer xmlSerializer = new XmlSerializer(typeof(List<DownloadOutput>));
+                deserializedList = (List<DownloadOutput>)xmlSerializer.Deserialize(fileStream);
 
                 foreach (var item in deserializedList)
                 {
-                    Enqueue(item);
+                    Add(item.FileName, item);
                 }
             }
             catch (Exception)
@@ -40,13 +40,25 @@ public class DownloadItemQueue : Queue<DownloadItem>
 
     public void Save(string storagePath)
     {
-        List<DownloadItem> downloadItemList = new List<DownloadItem>(this);
+        List<DownloadOutput> downloadItemList = new List<DownloadOutput>(this.Values);
 
         string filePath = Path.Join(storagePath, DataFileName);
         using (FileStream fileStream = new FileStream(filePath, FileMode.OpenOrCreate, FileAccess.Write))
         {
-            XmlSerializer xmlSerializer = new XmlSerializer(typeof(List<DownloadItem>));
+            XmlSerializer xmlSerializer = new XmlSerializer(typeof(List<DownloadOutput>));
             xmlSerializer.Serialize(fileStream, downloadItemList);
+        }
+    }
+
+    public void AddDownload (string fileName, string url)
+    {
+        if (!ContainsKey(fileName))
+        {
+            Add(fileName, new DownloadOutput(url, fileName));
+        }
+        else
+        {
+            this[fileName].Status = DownloadOutput.DownloadStatus.InProgress;
         }
     }
 }

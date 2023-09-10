@@ -6,6 +6,12 @@ public class DownloadItem
     public string FileURL { get; set; }
     public string FileName { get; set; }
 
+    public DownloadItem()
+    {
+        FileURL = "";
+        FileName = "";
+    }
+
     public DownloadItem(string url, string fileName)
     {
         FileURL = url;

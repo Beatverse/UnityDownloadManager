@@ -17,6 +17,7 @@ public class DownloadManager : MonoBehaviour
         }
     }
 
+    public string remoteStorageUrl = "https://beatcube-demo-public.s3.ap-southeast-1.amazonaws.com/musics";
     public string StoragePath = "Downloads";
     public int MaxConcurrencyJobs = 3;
 
@@ -24,7 +25,8 @@ public class DownloadManager : MonoBehaviour
     private DownloadJobList _downloadJobList;
 
     private bool _downloadItemQueueChanged;
-    private Dictionary<string, DownloadOutput> _downloadOutputs;
+    private bool _downloadOutputsChanged;
+    private DownloadOutputMap _downloadOutputs;
 
     public void Awake()
     {
@@ -35,13 +37,18 @@ public class DownloadManager : MonoBehaviour
 
         _downloadItemQueue = new DownloadItemQueue();
         _downloadJobList = new DownloadJobList();
-        _downloadOutputs = new Dictionary<string, DownloadOutput>();
+        _downloadOutputs = new DownloadOutputMap();
 
         _downloadItemQueueChanged = false;
+        _downloadOutputsChanged = false;
     }
 
     public DownloadOutput GetDownloadStatus (string fileName)
     {
+        if (!_downloadOutputs.ContainsKey(fileName))
+        {
+            return null;
+        }
         return _downloadOutputs[fileName];
     }
 
@@ -60,17 +67,16 @@ public class DownloadManager : MonoBehaviour
             }
         }
 
-        var downloadList = _downloadItemQueue.Load(StoragePath);
-        foreach (var downloadItem in downloadList)
-        {
-            _downloadOutputs[downloadItem.FileName] = new DownloadOutput(downloadItem.FileURL, downloadItem.FileName);
-        }
+        _downloadItemQueue.Load(StoragePath);
 
         _downloadJobList.Load(StoragePath, (list, item) => {
             DeserializeJob(list, item);
         });
 
+        _downloadOutputs.Load(StoragePath);
+
         _downloadItemQueueChanged = false;
+        _downloadOutputsChanged = false;
     }
 
     public void Update()
@@ -84,6 +90,12 @@ public class DownloadManager : MonoBehaviour
             if (!_downloadOutputs.ContainsKey(job.FileName))
             {
                 _downloadOutputs.Add(job.FileName, new DownloadOutput(job.FileURL, job.FileName));
+                _downloadOutputsChanged = true;
+            }
+
+            if (_downloadOutputs[job.FileName].TotalBytes != job.TotalBytes)
+            {
+                _downloadOutputsChanged = true;
             }
 
             _downloadOutputs[job.FileName].DownloadedBytes = job.DownloadedBytes;
@@ -102,11 +114,15 @@ public class DownloadManager : MonoBehaviour
 
                 Destroy(job.gameObject);
                 _downloadJobList.RemoveAt(i);
+
+                _downloadOutputsChanged = true;
             }
             else if (!job.HasStarted)
             {
                 _downloadOutputs[job.FileName].Status = DownloadOutput.DownloadStatus.InProgress;
                 job.Download();
+
+                _downloadOutputsChanged = true;
             }
         }
 
@@ -140,20 +156,22 @@ public class DownloadManager : MonoBehaviour
         {
             _downloadItemQueue.Save(StoragePath);
         }
+
+        if (_downloadOutputsChanged)
+        {
+            _downloadOutputs.Save(StoragePath);
+        }
     }
 
-    public void Download (string url, string fileName)
+    public void Download (string filePath, string fileName)
     {
-        _downloadItemQueue.Enqueue(new DownloadItem(url, fileName));
+        string url = remoteStorageUrl + "/" + filePath;
 
-        if (!_downloadOutputs.ContainsKey(fileName))
-        {
-            _downloadOutputs.Add(fileName, new DownloadOutput(url, fileName));
-        }
-        else
-        {
-            _downloadOutputs[fileName].Status = DownloadOutput.DownloadStatus.InProgress;
-        }
+        _downloadItemQueue.Enqueue(new DownloadItem(url, fileName));
+        _downloadOutputs.AddDownload(fileName, url);
+
+        _downloadItemQueueChanged = true;
+        _downloadOutputsChanged = true;
     }
 
     public void DeserializeJob (List<DownloadJob> list, DownloadJobData data)

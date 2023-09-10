@@ -94,8 +94,6 @@ public class DownloadJob : MonoBehaviour
         UnityWebRequest headRequest = UnityWebRequest.Head(FileURL);
         yield return headRequest.SendWebRequest();
 
-        Debug.Log(headRequest);
-
         TotalBytes = long.Parse(headRequest.GetResponseHeader("Content-Length"));
 
         if (DownloadedBytes < TotalBytes)
@@ -160,6 +158,10 @@ public class DownloadJob : MonoBehaviour
                 _fileStream.Close();
                 DownloadResult = Result.Success;
             }
+        }
+        else
+        {
+            DownloadResult = Result.Success;
         }
 
         Debug.Log("Download complete!");
